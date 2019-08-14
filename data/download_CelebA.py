@@ -3,7 +3,7 @@ Modification of
 - https://github.com/carpedm20/DCGAN-tensorflow/blob/master/download.py
 - http://stackoverflow.com/a/39225039
 """
-from __future__ import print_function
+
 import os
 import zipfile
 import requests
@@ -25,7 +25,7 @@ def download_file_from_google_drive(id, destination):
     save_response_content(response, destination)
 
 def get_confirm_token(response):
-    for key, value in response.cookies.items():
+    for key, value in list(response.cookies.items()):
         if key.startswith('download_warning'):
             return value
     return None
