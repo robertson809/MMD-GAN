@@ -69,7 +69,7 @@ class ALICropAndScale(object):
 def get_data(args, train_flag=True):
     transform = transforms.Compose([
         transforms.Scale(args.image_size),
-        transforms.CenterCrop(args.image_size),
+        transforms.CenterCrop(args.image_size), #what is the point of using both of these since they do the same thing
         transforms.ToTensor(),
         transforms.Normalize(
             (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
