@@ -59,23 +59,23 @@ class Decoder(nn.Module):
         time.sleep(2)
         print('initial.{0}-{1}.convt'.format(k, cngf))
         time.sleep(10)
-        main.add_module('initial.{0}-{1}.convt'.format(k, cngf), nn.ConvTranspose2d(k, cngf, 4, 1, 0, bias=False))
-        main.add_module('initial.{0}.batchnorm'.format(cngf), nn.BatchNorm2d(cngf))
-        main.add_module('initial.{0}.relu'.format(cngf), nn.ReLU(True))
+        main.add_module('initial_{0}-{1}_convt'.format(k, cngf), nn.ConvTranspose2d(k, cngf, 4, 1, 0, bias=False))
+        main.add_module('initial_{0}_batchnorm'.format(cngf), nn.BatchNorm2d(cngf))
+        main.add_module('initial_{0}_relu'.format(cngf), nn.ReLU(True))
 
         csize = 4
         while csize < isize // 2:
-            main.add_module('pyramid.{0}-{1}.convt'.format(cngf, cngf // 2),
+            main.add_module('pyramid_{0}_{1}.convt'.format(cngf, cngf // 2),
                             nn.ConvTranspose2d(cngf, cngf // 2, 4, 2, 1, bias=False))
-            main.add_module('pyramid.{0}.batchnorm'.format(cngf // 2),
+            main.add_module('pyramid_{0}_batchnorm'.format(cngf // 2),
                             nn.BatchNorm2d(cngf // 2))
-            main.add_module('pyramid.{0}.relu'.format(cngf // 2),
+            main.add_module('pyramid_{0}_relu'.format(cngf // 2),
                             nn.ReLU(True))
             cngf = cngf // 2
             csize = csize * 2
 
-        main.add_module('final.{0}-{1}.convt'.format(cngf, nc), nn.ConvTranspose2d(cngf, nc, 4, 2, 1, bias=False))
-        main.add_module('final.{0}.tanh'.format(nc),
+        main.add_module('final_{0}-{1}_convt'.format(cngf, nc), nn.ConvTranspose2d(cngf, nc, 4, 2, 1, bias=False))
+        main.add_module('final_{0}_tanh'.format(nc),
                         nn.Tanh())
 
         self.main = main
