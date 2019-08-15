@@ -55,7 +55,7 @@ class Decoder(nn.Module):
 
         main = nn.Sequential()
         import time
-        print("Testing name")
+        print("Testing name poop")
         time.sleep(2)
         print('initial_{0}-{1}_convt'.format(k, cngf))
         time.sleep(10)
