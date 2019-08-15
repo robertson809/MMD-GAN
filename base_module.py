@@ -57,7 +57,7 @@ class Decoder(nn.Module):
         import time
         print("Testing name")
         time.sleep(2)
-        print('initial.{0}-{1}.convt'.format(k, cngf))
+        print('initial_{0}-{1}_convt'.format(k, cngf))
         time.sleep(10)
         main.add_module('initial_{0}-{1}_convt'.format(k, cngf), nn.ConvTranspose2d(k, cngf, 4, 1, 0, bias=False))
         main.add_module('initial_{0}_batchnorm'.format(cngf), nn.BatchNorm2d(cngf))
