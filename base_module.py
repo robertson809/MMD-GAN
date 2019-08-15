@@ -65,7 +65,7 @@ class Decoder(nn.Module):
 
         csize = 4
         while csize < isize // 2:
-            main.add_module('pyramid_{0}_{1}.convt'.format(cngf, cngf // 2),
+            main.add_module('pyramid_{0}_{1}_convt'.format(cngf, cngf // 2),
                             nn.ConvTranspose2d(cngf, cngf // 2, 4, 2, 1, bias=False))
             main.add_module('pyramid_{0}_batchnorm'.format(cngf // 2),
                             nn.BatchNorm2d(cngf // 2))
