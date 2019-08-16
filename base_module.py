@@ -7,19 +7,19 @@ import torch.nn as nn
 # input: batch_size * nc * 64 * 64
 # output: batch_size * k * 1 * 1
 class Encoder(nn.Module):
-    def __init__(self, isize, nc, k=100, ndf=64):
+    def __init__(self, isize, input_size, k=100, layer_size=64): #k is latent dimension, 100 is replaced in actual method call
         super(Encoder, self).__init__()
         assert isize % 16 == 0, "isize has to be a multiple of 16"
 
         # input is nc x isize x isize
         main = nn.Sequential()
-        main.add_module('initial.conv.{0}-{1}'.format(nc, ndf),
-                        nn.Conv2d(nc, ndf, 4, 2, 1, bias=False))
-        main.add_module('initial.relu.{0}'.format(ndf),
-                        nn.LeakyReLU(0.2, inplace=True))
+        main.add_module('initial.layer.{0}-{1}'.format(input_size, layer_size),
+                        nn.Linear(input_size, layer_size, bias=False))
+        main.add_module('initial.relu.{0}'.format(layer_size),
+                        nn.LeakyReLU(0.2, inplace=True)) #0.2 is starting negative slope
         csize, cndf = isize / 2, ndf
 
-        while csize > 4:
+        while csize > 4: #these are the inbetween layers, go down to the latent dimension?
             in_feat = cndf
             out_feat = cndf * 2
             main.add_module('pyramid.{0}-{1}.conv'.format(in_feat, out_feat),
@@ -32,7 +32,7 @@ class Encoder(nn.Module):
             csize = csize / 2
 
         main.add_module('final.{0}-{1}.conv'.format(cndf, 1),
-                        nn.Conv2d(cndf, k, 4, 1, 0, bias=False))
+                        nn.Conv2d(cndf, k, 4, 1, 0, bias=False)) #final outputs to the latent dimension
 
         self.main = main
 
@@ -41,7 +41,7 @@ class Encoder(nn.Module):
         return output
 
 
-# input: batch_size * k * 1 * 1
+# input: batch_size * k * 1 * 1 because k is the latent dimension
 # output: batch_size * nc * image_size * image_size
 class Decoder(nn.Module):
     def __init__(self, isize, nc, k=100, ngf=64):
@@ -54,17 +54,12 @@ class Decoder(nn.Module):
             tisize = tisize * 2
 
         main = nn.Sequential()
-        import time
-        print("Testing name poop")
-        time.sleep(2)
-        print('initial_{0}-{1}_convt'.format(k, cngf))
-        time.sleep(10)
         main.add_module('initial_{0}-{1}_convt'.format(k, cngf), nn.ConvTranspose2d(k, cngf, 4, 1, 0, bias=False))
         main.add_module('initial_{0}_batchnorm'.format(cngf), nn.BatchNorm2d(cngf))
         main.add_module('initial_{0}_relu'.format(cngf), nn.ReLU(True))
 
         csize = 4
-        while csize < isize // 2:
+        while csize < isize // 2: #built back up from latent dimension
             main.add_module('pyramid_{0}_{1}_convt'.format(cngf, cngf // 2),
                             nn.ConvTranspose2d(cngf, cngf // 2, 4, 2, 1, bias=False))
             main.add_module('pyramid_{0}_batchnorm'.format(cngf // 2),

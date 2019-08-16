@@ -169,6 +169,11 @@ for t in range(args.max_iter):
                 p.data.clamp_(-0.01, 0.01)
 
             data = data_iter.next()
+            import time
+            print("viewing the data")
+            time.sleep(3)
+            print("data looks like", data)
+            time.sleep(10)
             i += 1
             netD.zero_grad()
 
