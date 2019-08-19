@@ -8,12 +8,14 @@ import torch
 import torch.nn as nn
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
-import torch.utils.data
+import torch.utils.data as utils
 import torchvision.utils as vutils
 from torch.autograd import Variable
 import torch.nn.functional as F
 import os
 import timeit
+import click
+import time as tm
 
 import util
 import numpy as np
@@ -67,11 +69,12 @@ class ONE_SIDED(nn.Module):
         return output
 
 
+
 # Get argument
 parser = argparse.ArgumentParser()
 parser = util.get_args(parser)
 args = parser.parse_args()
-print(args)
+
 
 if args.experiment is None:
     args.experiment = 'samples'
@@ -92,17 +95,21 @@ torch.cuda.manual_seed(args.manual_seed)
 cudnn.benchmark = True
 
 # Get data
-trn_dataset = util.get_data(args, train_flag=True)
-trn_loader = torch.utils.data.DataLoader(trn_dataset,
-                                         batch_size=args.batch_size,
-                                         shuffle=True,
-                                         num_workers=int(args.workers))
+data_michael = np.load(args.datapath).astype(np.float32)
+my_tensor = torch.stack([torch.Tensor(row) for row in data_michael])
+my_dataset = utils.TensorDataset(my_tensor)
+my_dataloader = utils.DataLoader(my_dataset,
+                                            batch_size=args.batch_size,
+                                            shuffle=True,
+                                            num_workers=int(args.workers))
+print("made it here")
+tm.sleep(10)
 
 # construct encoder/decoder modules
 hidden_dim = args.nz
-G_decoder = base_module.Decoder(args.image_size, args.nc, k=args.nz, ngf=64)
-D_encoder = base_module.Encoder(args.image_size, args.nc, k=hidden_dim, ndf=64)
-D_decoder = base_module.Decoder(args.image_size, args.nc, k=hidden_dim, ngf=64)
+G_decoder = base_module.Decoder(args.image_size, args.nc, latent_dim=args.nz, ngf=64)
+D_encoder = base_module.Encoder(args.image_size, args.nc, latent_dim=hidden_dim, layer_size=64)
+D_decoder = base_module.Decoder(args.image_size, args.nc, latent_dim=hidden_dim, ngf=64)
 
 netG = NetG(G_decoder)
 netD = NetD(D_encoder, D_decoder)
@@ -143,9 +150,9 @@ lambda_rg = 16.0
 time = timeit.default_timer()
 gen_iterations = 0
 for t in range(args.max_iter):
-    data_iter = iter(trn_loader)
+    data_iter = iter(my_dataloader)
     i = 0
-    while (i < len(trn_loader)):
+    while (i < len(my_dataloader)):
         # ---------------------------
         #        Optimize over NetD
         # ---------------------------
@@ -158,9 +165,8 @@ for t in range(args.max_iter):
         else:
             Diters = 5
             Giters = 1
-
         for j in range(Diters):
-            if i == len(trn_loader):
+            if i == len(my_dataloader):
                 break
 
             # clamp parameters of NetD encoder to a cube

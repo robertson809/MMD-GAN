@@ -12,8 +12,8 @@ from os.path import join
 
 
 def get_args(parser):
-    parser.add_argument('--dataset', required=True, help='mnist | cifar10 | cifar100 | lsun | imagenet | folder | lfw ')
-    parser.add_argument('--dataroot', required=True, help='path to dataset')
+    #parser.add_argument('--dataset', required=True, help='mnist | cifar10 | cifar100 | lsun | imagenet | folder | lfw ')
+    parser.add_argument('--datapath', required=True, help='path to dataset')
     parser.add_argument('--workers', type=int, help='number of data loading workers', default=4)
     parser.add_argument('--batch_size', type=int, default=64, help='input batch size')
     parser.add_argument('--image_size', type=int, default=64, help='the height / width of the input image to network')
@@ -38,11 +38,10 @@ def load_img(filepath):
     return img
 
 
-class FolderWithImages(data.Dataset):
-    def __init__(self, root, input_transform=None, target_transform=None):
-        super(FolderWithImages, self).__init__()
-        self.image_filenames = [join(root, x)
-                                for x in listdir(root) if is_image_file(x.lower())]
+class FileWithText(data.Dataset):
+    def __init__(self, filename, input_transform=None, target_transform=None):
+        super(FileWithText, self).__init__()
+        self.filename = filename
 
         self.input_transform = input_transform
         self.target_transform = target_transform
@@ -54,7 +53,6 @@ class FolderWithImages(data.Dataset):
             input = self.input_transform(input)
         if self.target_transform:
             target = self.target_transform(target)
-
         return input, target
 
     def __len__(self):
@@ -66,46 +64,46 @@ class ALICropAndScale(object):
         return img.resize((64, 78), Image.ANTIALIAS).crop((0, 7, 64, 64 + 7))
 
 
-def get_data(args, train_flag=True):
+def get_data(dataset, train_flag=True): #normalize and clean the data
     transform = transforms.Compose([
-        transforms.Scale(args.image_size),
-        transforms.CenterCrop(args.image_size), #what is the point of using both of these since they do the same thing
+        transforms.Scale(dataset.image_size),
+        transforms.CenterCrop(dataset.image_size), #what is the point of using both of these since they do the same thing
         transforms.ToTensor(),
         transforms.Normalize(
             (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
 
-    if args.dataset in ['imagenet', 'folder', 'lfw']:
-        dataset = dset.ImageFolder(root=args.dataroot,
+    if dataset.dataset in ['imagenet', 'folder', 'lfw']:
+        dataset = dset.ImageFolder(root=dataset.dataroot,
                                    transform=transform)
 
-    elif args.dataset == 'lsun':
-        dataset = dset.LSUN(db_path=args.dataroot,
+    elif dataset.dataset == 'lsun':
+        dataset = dset.LSUN(db_path=dataset.dataroot,
                             classes=['bedroom_train'],
                             transform=transform)
 
-    elif args.dataset == 'cifar10':
-        dataset = dset.CIFAR10(root=args.dataroot,
+    elif dataset.dataset == 'cifar10':
+        dataset = dset.CIFAR10(root=dataset.dataroot,
                                download=True,
                                train=train_flag,
                                transform=transform)
 
-    elif args.dataset == 'cifar100':
-        dataset = dset.CIFAR100(root=args.dataroot,
+    elif dataset.dataset == 'cifar100':
+        dataset = dset.CIFAR100(root=dataset.dataroot,
                                 download=True,
                                 train=train_flag,
                                 transform=transform)
 
-    elif args.dataset == 'mnist':
-        dataset = dset.MNIST(root=args.dataroot,
+    elif dataset.dataset == 'mnist':
+        dataset = dset.MNIST(root=dataset.dataroot,
                              download=True,
                              train=train_flag,
                              transform=transform)
 
-    elif args.dataset == 'celeba':
+    elif dataset.dataset == 'celeba':
         imdir = 'train' if train_flag else 'val'
-        dataroot = os.path.join(args.dataroot, imdir)
-        if args.image_size != 64:
+        dataroot = os.path.join(dataset.dataroot, imdir)
+        if dataset.image_size != 64:
             raise ValueError('the image size for CelebA dataset need to be 64!')
 
         dataset = FolderWithImages(root=dataroot,
@@ -118,7 +116,7 @@ def get_data(args, train_flag=True):
                                    target_transform=transforms.ToTensor()
                                    )
     else:
-        raise ValueError("Unknown dataset %s" % (args.dataset))
+        raise ValueError("Unknown dataset %s" % (dataset.dataset))
     return dataset
 
 
