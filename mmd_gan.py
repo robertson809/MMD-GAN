@@ -23,18 +23,22 @@ import numpy as np
 import base_module
 from mmd import mix_rbf_mmd2
 
+# import sys
+# sys.path.append('pydevd-pycharm.egg')
+# import pydevd_pycharm
+# pydevd_pycharm.settrace('127.0.0.1', port=8200, stdoutToServer=True, stderrToServer=True)
 
 # NetG is a decoder
 # input: batch_size * nz * 1 * 1
 # output: batch_size * nc * image_size * image_size
+#netG = NetG(G_decoder)
 class NetG(nn.Module):
     def __init__(self, decoder):
         super(NetG, self).__init__()
-        self.decoder = decoder
+        self.decoder = decoder #nn.sequential operator
 
     def forward(self, input):
-        output = self.decoder(input)
-        return output
+        return self.decoder(input)
 
 
 # NetD is an encoder + decoder
@@ -45,16 +49,17 @@ class NetD(nn.Module):
     def __init__(self, encoder, decoder):
         super(NetD, self).__init__()
         self.encoder = encoder
-        self.decoder = decoder
+        self.decoder = decoder #nn.sequential operator
 
     def forward(self, input):
-        f_enc_X = self.encoder(input)
+        f_enc_X= self.encoder(input)
         f_dec_X = self.decoder(f_enc_X)
+        # print('BM 57: type of f_enc_X is ', type(f_enc_X))
+        # print('type of f_dec_X is ', type(f_dec_X))
 
         f_enc_X = f_enc_X.view(input.size(0), -1)
         f_dec_X = f_dec_X.view(input.size(0), -1)
         return f_enc_X, f_dec_X
-
 
 class ONE_SIDED(nn.Module):
     def __init__(self):
@@ -102,17 +107,15 @@ my_dataloader = utils.DataLoader(my_dataset,
                                             batch_size=args.batch_size,
                                             shuffle=True,
                                             num_workers=int(args.workers))
-print("made it here")
-tm.sleep(10)
 
 # construct encoder/decoder modules
-hidden_dim = args.nz
-G_decoder = base_module.Decoder(args.image_size, args.nc, latent_dim=args.nz, ngf=64)
-D_encoder = base_module.Encoder(args.image_size, args.nc, latent_dim=hidden_dim, layer_size=64)
-D_decoder = base_module.Decoder(args.image_size, args.nc, latent_dim=hidden_dim, ngf=64)
+D_encoder = base_module.Encoder(args.input_size, args.initial_layer_size, args.hidden_dim) #returns nn.sequential method
+#print('line 111 is D_encoder', D_encoder)
+D_decoder = base_module.Decoder(args.input_size, args.initial_layer_size, args.hidden_dim) #returns a nn.sequential method
+G_decoder = base_module.Decoder(args.input_size, args.initial_layer_size, args.hidden_dim)
 
-netG = NetG(G_decoder)
-netD = NetD(D_encoder, D_decoder)
+netG = NetG(G_decoder)  #returns decoded input
+netD = NetD(D_encoder, D_decoder)  #returns tuple of encoded x and decoded x
 one_sided = ONE_SIDED()
 print("netG:", netG)
 print("netD:", netD)
@@ -128,7 +131,7 @@ sigma_list = [1, 2, 4, 8, 16]
 sigma_list = [sigma / base for sigma in sigma_list]
 
 # put variable into cuda device
-fixed_noise = torch.cuda.FloatTensor(64, args.nz, 1, 1).normal_(0, 1)
+fixed_noise = torch.cuda.FloatTensor(args.batch_size, args.hidden_dim).normal_(0, 1)
 one = torch.cuda.FloatTensor([1])
 mone = one * -1
 if args.cuda:
@@ -175,23 +178,24 @@ for t in range(args.max_iter):
                 p.data.clamp_(-0.01, 0.01)
 
             data = data_iter.next()
-            import time
-            print("viewing the data")
-            time.sleep(3)
-            print("data looks like", data)
-            time.sleep(10)
             i += 1
             netD.zero_grad()
 
-            x_cpu, _ = data
+            x_cpu = data[0] #changed
             x = Variable(x_cpu.cuda())
             batch_size = x.size(0)
 
+            #print('MMD188',netD(x))
             f_enc_X_D, f_dec_X_D = netD(x)
 
-            noise = torch.cuda.FloatTensor(batch_size, args.nz, 1, 1).normal_(0, 1)
-            noise = Variable(noise, volatile=True)  # total freeze netG
-            y = Variable(netG(noise).data)
+            #print('line 191', batch_size,args.hidden_dim)
+            noise = torch.cuda.FloatTensor(batch_size, args.hidden_dim).normal_(0, 1) #give values
+                                                #from a normal distribution with mean 0 std 1
+            #print('line 194:', noise.size())
+            #print('len(noise)', len(noise))
+            #print('type(noise)', type(noise))
+            noise = torch.cuda.FloatTensor(noise)  # total freeze netG
+            y = torch.cuda.FloatTensor(netG(noise).data)
 
             f_enc_Y_D, f_dec_Y_D = netD(y)
 
@@ -219,21 +223,21 @@ for t in range(args.max_iter):
             p.requires_grad = False
 
         for j in range(Giters):
-            if i == len(trn_loader):
+            if i == len(my_dataloader):
                 break
 
             data = data_iter.next()
             i += 1
             netG.zero_grad()
 
-            x_cpu, _ = data
+            x = data[0] #changed
             x = Variable(x_cpu.cuda())
             batch_size = x.size(0)
 
             f_enc_X, f_dec_X = netD(x)
 
-            noise = torch.cuda.FloatTensor(batch_size, args.nz, 1, 1).normal_(0, 1)
-            noise = Variable(noise)
+            noise = torch.cuda.FloatTensor(batch_size, args.hidden_dim).normal_(0, 1)
+            noise = torch.cuda.FloatTensor(noise)   #mabye need to do something with volitile call here
             y = netG(noise)
 
             f_enc_Y, f_dec_Y = netD(y)
@@ -253,20 +257,30 @@ for t in range(args.max_iter):
 
         run_time = (timeit.default_timer() - time) / 60.0
         print('[%3d/%3d][%3d/%3d] [%5d] (%.2f m) MMD2_D %.6f hinge %.6f L2_AE_X %.6f L2_AE_Y %.6f loss_D %.6f Loss_G %.6f f_X %.6f f_Y %.6f |gD| %.4f |gG| %.4f'
-              % (t, args.max_iter, i, len(trn_loader), gen_iterations, run_time,
-                 mmd2_D.data[0], one_side_errD.data[0],
-                 L2_AE_X_D.data[0], L2_AE_Y_D.data[0],
-                 errD.data[0], errG.data[0],
-                 f_enc_X_D.mean().data[0], f_enc_Y_D.mean().data[0],
+              % (t, args.max_iter, i, len(my_dataloader), gen_iterations, run_time,
+                 mmd2_D.data.item(), one_side_errD.item(),
+                 L2_AE_X_D.item(), L2_AE_Y_D.item(),
+                 errD.item(), errG.item(),
+                 f_enc_X_D.mean().item(), f_enc_Y_D.mean().item(),
                  base_module.grad_norm(netD), base_module.grad_norm(netG)))
 
-        if gen_iterations % 500 == 0:
-            y_fixed = netG(fixed_noise)
-            y_fixed.data = y_fixed.data.mul(0.5).add(0.5)
-            f_dec_X_D = f_dec_X_D.view(f_dec_X_D.size(0), args.nc, args.image_size, args.image_size)
-            f_dec_X_D.data = f_dec_X_D.data.mul(0.5).add(0.5)
-            vutils.save_image(y_fixed.data, '{0}/fake_samples_{1}.png'.format(args.experiment, gen_iterations))
-            vutils.save_image(f_dec_X_D.data, '{0}/decode_samples_{1}.png'.format(args.experiment, gen_iterations))
+        if gen_iterations % 500 == 0:  #what is this doing? it's saving intermediate images
+            y_fixed = netG(fixed_noise)  #keep generating from the same noise I guess
+            #y_fixed.data = y_fixed.data.mul(0.5).add(0.5) #no thank you
+            #print('full tensor.data', f_dec_X_D.data)
+            decoded_sample = f_dec_X_D.data
+            # print('size:', f_dec_X_D.size())
+            # print('type:', type(f_dec_X))
+            torch.save("{0}/dedcoded_sample_at_{1}.txt".format(args.experiment, gen_iterations),
+                                                                        './samples/decoded_examples.txt')
+            torch.save(f_dec_X_D.data, './samples/decoded_examples.txt')
+            torch.save("{0}/dedcoded_sample_at_{1}.txt".format(args.experiment, gen_iterations),
+                                                                                './samples/generated_examples.txt')
+            torch.save(y_fixed,'./samples/generated_examples.txt')
+            #view is reshape, figure out how I need to transform this stuff to save it
+            #f_dec_X_D.data = f_dec_X_D.data.mul(0.5).add(0.5) don't need to do that
+            #vutils.save_image(y_fixed.data, '{0}/generated_samples_{1}.txt'.format(args.experiment, gen_iterations))
+            #vutils.save_image(f_dec_X_D.data, '{0}/decoded_samples_{1}.txt'.format(args.experiment, gen_iterations))
 
     if t % 50 == 0:
         torch.save(netG.state_dict(), '{0}/netG_iter_{1}.pth'.format(args.experiment, t))
